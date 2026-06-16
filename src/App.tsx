@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { authService, gameService } from './services';
 import { isOnlineMode } from './services/api';
+import { startSSOBackgroundCheck, getAuthServerUrl } from './shared/auth/sso-helper';
+import { SSOLoginPanel } from './shared/auth/SSOLoginPanel';
 import { WebAudioSequencer } from './game/WebAudioSequencer';
 import { isPlayerVacant } from './game/gameState';
 import type { GameState, Player } from './game/gameState';
@@ -122,13 +124,35 @@ export default function App() {
 
   // Fetch session and games
   useEffect(() => {
+    let active = true;
+    let cleanupBackgroundCheck: (() => void) | null = null;
+
     authService.initCSRF().then(() => {
       authService.checkSession().then((user: any) => {
+        if (!active) return;
         if (user) {
           setCurrentUser(user);
+        } else if (online) {
+          cleanupBackgroundCheck = startSSOBackgroundCheck({
+            clientId: 'gridlock-neon',
+            onSuccess: async () => {
+              const uData = await authService.checkSession();
+              if (uData && active) {
+                setCurrentUser(uData);
+                setErrorMsg(null);
+              }
+            }
+          });
         }
       });
     });
+
+    return () => {
+      active = false;
+      if (cleanupBackgroundCheck) {
+        cleanupBackgroundCheck();
+      }
+    };
   }, [online]);
 
   useEffect(() => {
@@ -225,6 +249,7 @@ export default function App() {
     setActiveGameId(null);
     setGameState(null);
     setIsPlaying(false);
+    window.location.href = `${getAuthServerUrl()}/api/auth/logout?redirect_uri=${encodeURIComponent(window.location.origin)}`;
   };
 
   const createNewGame = async (e: React.FormEvent) => {
@@ -1212,83 +1237,108 @@ export default function App() {
 
           {/* Setup Panel */}
           <div className="glass-panel">
-            <h2 className="text-neon-pink" style={{ fontSize: '1.2rem', marginBottom: '20px' }}>SPIN GRIDWAY</h2>
-            
-            {/* Create Lobby */}
-            <form onSubmit={createNewGame} className="session-setup-form" style={{ marginBottom: '30px' }}>
-              <div className="form-group">
-                <label>LOBBY NAME</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="e.g. Viper Runner Gridway" 
-                  value={newGameName}
-                  onChange={e => setNewGameName(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>MAX PLAYERS</label>
-                <select 
-                  className="form-control" 
-                  value={newGamePlayers}
-                  onChange={e => setNewGamePlayers(Number(e.target.value))}
-                >
-                  <option value="2">2 Players</option>
-                  <option value="4">4 Players</option>
-                  <option value="8">8 Players</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>TRACK LENGTH</label>
-                <select 
-                  className="form-control" 
-                  value={newGameDistance}
-                  onChange={e => setNewGameDistance(Number(e.target.value))}
-                >
-                  <option value="500">500 meters (Sprint)</option>
-                  <option value="1000">1000 meters (Standard)</option>
-                  <option value="2000">2000 meters (Survival Yeti)</option>
-                </select>
-              </div>
-              <button 
-                type="submit" 
-                className="btn primary-cyan" 
-                style={{ width: '100%', justifyContent: 'center' }}
-                disabled={online && !currentUser}
-              >
-                Launch Lobby
-              </button>
-              {online && !currentUser && (
-                <span className="text-neon-pink font-mono" style={{ fontSize: '0.75rem', textAlign: 'center' }}>
-                  * SSO authentication required to spin online gridways.
-                </span>
-              )}
-            </form>
+            {online && !currentUser ? (
+              <SSOLoginPanel
+                title="GRIDLOCK NEON"
+                subtitle="Gridway Runner Node"
+                authError={errorMsg || ''}
+                buttonText="DOCK COMMAND CONSOLE"
+                isGooglePolling={false}
+                playOnline={online}
+                onPlayOnlineChange={handleOnlineToggle}
+                onLoginClick={handleSSOLogin}
+                onCancelGooglePoll={() => {}}
+                themeColor="#00f0ff"
+                icon={
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                }
+                containerClassName=""
+                cardClassName=""
+                buttonClassName="btn primary-cyan"
+              />
+            ) : (
+              <>
+                <h2 className="text-neon-pink" style={{ fontSize: '1.2rem', marginBottom: '20px' }}>SPIN GRIDWAY</h2>
+                
+                {/* Create Lobby */}
+                <form onSubmit={createNewGame} className="session-setup-form" style={{ marginBottom: '30px' }}>
+                  <div className="form-group">
+                    <label>LOBBY NAME</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Viper Runner Gridway" 
+                      value={newGameName}
+                      onChange={e => setNewGameName(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>MAX PLAYERS</label>
+                    <select 
+                      className="form-control" 
+                      value={newGamePlayers}
+                      onChange={e => setNewGamePlayers(Number(e.target.value))}
+                    >
+                      <option value="2">2 Players</option>
+                      <option value="4">4 Players</option>
+                      <option value="8">8 Players</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>TRACK LENGTH</label>
+                    <select 
+                      className="form-control" 
+                      value={newGameDistance}
+                      onChange={e => setNewGameDistance(Number(e.target.value))}
+                    >
+                      <option value="500">500 meters (Sprint)</option>
+                      <option value="1000">1000 meters (Standard)</option>
+                      <option value="2000">2000 meters (Survival Yeti)</option>
+                    </select>
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn primary-cyan" 
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    disabled={online && !currentUser}
+                  >
+                    Launch Lobby
+                  </button>
+                  {online && !currentUser && (
+                    <span className="text-neon-pink font-mono" style={{ fontSize: '0.75rem', textAlign: 'center' }}>
+                      * SSO authentication required to spin online gridways.
+                    </span>
+                  )}
+                </form>
 
-            {/* Join Lobby by code */}
-            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '20px 0' }} />
-            <h2 className="text-neon-cyan" style={{ fontSize: '1.1rem', marginBottom: '15px' }}>DOCK INTO GRIDWAY</h2>
-            <form onSubmit={joinGameByCode} className="session-setup-form">
-              <div className="form-group">
-                <label>INVITE CODE / LOBBY ID</label>
-                <input 
-                  type="text" 
-                  className="form-control font-mono" 
-                  style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
-                  placeholder="CODE (e.g. A4FB)" 
-                  value={joinInviteCode}
-                  onChange={e => setJoinInviteCode(e.target.value)}
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="btn outline-cyan" 
-                style={{ width: '100%', justifyContent: 'center' }}
-                disabled={online && !currentUser}
-              >
-                Request Grid Access
-              </button>
-            </form>
+                {/* Join Lobby by code */}
+                <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.05)', margin: '20px 0' }} />
+                <h2 className="text-neon-cyan" style={{ fontSize: '1.1rem', marginBottom: '15px' }}>DOCK INTO GRIDWAY</h2>
+                <form onSubmit={joinGameByCode} className="session-setup-form">
+                  <div className="form-group">
+                    <label>INVITE CODE / LOBBY ID</label>
+                    <input 
+                      type="text" 
+                      className="form-control font-mono" 
+                      style={{ textTransform: 'uppercase', letterSpacing: '1px' }}
+                      placeholder="CODE (e.g. A4FB)" 
+                      value={joinInviteCode}
+                      onChange={e => setJoinInviteCode(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    className="btn outline-cyan" 
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    disabled={online && !currentUser}
+                  >
+                    Request Grid Access
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       ) : (
