@@ -95,6 +95,7 @@ body::before {
   padding: 24px;
   box-sizing: border-box;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  min-width: 0;
 }
 
 .glass-panel.cyan {
@@ -259,7 +260,7 @@ header h1 {
 
 @media (max-width: 900px) {
   .dashboard-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -292,6 +293,9 @@ header h1 {
   font-size: 1rem;
   transition: all 0.3s ease;
   outline: none;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-control:focus {
@@ -398,7 +402,7 @@ header h1 {
 
 @media (max-width: 800px) {
   .lobby-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -473,7 +477,7 @@ header h1 {
 
 @media (max-width: 1100px) {
   .game-screen {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .game-screen-center {
     order: -1;
@@ -643,4 +647,447 @@ canvas {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* SSO Inline Dashboard Widget Styles */
+.sso-dashboard-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.sso-dashboard-card {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  font-family: var(--font-mono);
+  color: #f8fafc;
+  text-align: center;
+}
+
+/* Mobile Gameplay HUD and Virtual Controls */
+.mobile-gameplay-ui {
+  display: none;
+  width: 100%;
+  max-width: 800px;
+  margin-top: 15px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .mobile-gameplay-ui {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+}
+
+.mobile-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-hud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.mobile-hud-row.bottom-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 8px;
+}
+
+.mobile-hud-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-hud-metric.text-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  letter-spacing: 1px;
+}
+
+.metric-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.metric-value.cyan {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+}
+
+.metric-value.pink {
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px rgba(255, 0, 127, 0.4);
+}
+
+.mobile-shield-bar, .mobile-sabotage-bar {
+  display: flex;
+  gap: 4px;
+  height: 8px;
+  width: 80px;
+}
+
+.shield-segment, .sabotage-segment {
+  flex: 1;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 1px;
+  transition: all 0.2s ease;
+}
+
+.shield-segment.active {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+}
+
+.sabotage-segment.active {
+  background: var(--neon-pink);
+  box-shadow: 0 0 8px var(--neon-pink);
+}
+
+.mobile-sabotage-targets {
+  display: flex;
+  gap: 6px;
+}
+
+.mobile-sabotage-btn {
+  padding: 4px 8px !important;
+  font-size: 0.7rem !important;
+}
+
+.mobile-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 20px;
+}
+
+.mobile-control-section {
+  display: flex;
+  gap: 12px;
+}
+
+.virtual-btn {
+  height: 60px;
+  min-width: 70px;
+  border-radius: 12px !important;
+  font-family: var(--font-heading) !important;
+  font-size: 0.9rem !important;
+  font-weight: 900 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Movement keys are Neon Cyan themed */
+.movement-keys .virtual-btn {
+  border: 1px solid var(--neon-cyan) !important;
+  color: var(--neon-cyan) !important;
+  background: rgba(0, 255, 255, 0.05) !important;
+}
+
+.movement-keys .virtual-btn:active {
+  background: rgba(0, 255, 255, 0.2) !important;
+  box-shadow: 0 0 15px var(--neon-cyan) !important;
+  transform: scale(0.95) translateY(2px) !important;
+}
+
+/* Action keys are Neon Pink themed */
+.action-keys .virtual-btn {
+  border: 1px solid var(--neon-pink) !important;
+  color: var(--neon-pink) !important;
+  background: rgba(255, 0, 127, 0.05) !important;
+  min-width: 90px;
+}
+
+.action-keys .virtual-btn:active {
+  background: rgba(255, 0, 127, 0.2) !important;
+  box-shadow: 0 0 15px var(--neon-pink) !important;
+  transform: scale(0.95) translateY(2px) !important;
+}
+
+.arrow-btn {
+  font-size: 1.2rem !important;
+}
+
+/* Mobile general responsive styling */
+body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Table name truncation globally */
+.games-list-table td:first-child {
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Truncate player name and email in lobby slots */
+.slot-player-info {
+  min-width: 0;
+}
+.slot-player-info span, .slot-player-info div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+  display: block;
+}
+
+@media (max-width: 1100px) {
+  .canvas-container {
+    max-height: 45vh; /* Limit canvas height to fit screen on medium/stacked layouts */
+  }
+  .game-screen-center {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 12px;
+  }
+  
+  header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+  }
+  
+  header h1 {
+    font-size: 1.8rem;
+    text-align: center;
+  }
+  
+  .tagline {
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  
+  header > div:last-child {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  /* Compact header styling during active gameplay */
+  header.compact {
+    flex-direction: row !important;
+    align-items: center !important;
+    text-align: left !important;
+    gap: 10px !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+  }
+  
+  header.compact h1 {
+    font-size: 1.3rem !important;
+    text-align: left !important;
+  }
+  
+  header.compact > div:last-child {
+    width: auto !important;
+    justify-content: flex-end !important;
+  }
+
+  .canvas-container {
+    max-height: 38vh !important;
+  }
+
+  .game-screen-center {
+    gap: 10px;
+  }
+  
+  .mobile-gameplay-ui {
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .mobile-hud {
+    padding: 8px 12px !important;
+  }
+
+  .virtual-btn {
+    height: 52px !important;
+    min-width: 60px !important;
+  }
+
+  .action-keys .virtual-btn {
+    min-width: 75px !important;
+  }
+
+  .progress-tracks {
+    padding: 8px 12px !important;
+    gap: 6px !important;
+  }
+
+  .progress-track-row {
+    gap: 8px !important;
+  }
+  
+  .dashboard-grid {
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .glass-panel {
+    padding: 16px;
+  }
+  
+  .games-list-table th, .games-list-table td {
+    padding: 8px 6px;
+    font-size: 0.75rem;
+  }
+  
+  .lobby-layout {
+    gap: 15px;
+  }
+  
+  .slot-row {
+    padding: 10px 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Hide Invite Code and Track Length columns on smaller screens to prevent grid overflow */
+  .games-list-table th:nth-child(2),
+  .games-list-table td:nth-child(2),
+  .games-list-table th:nth-child(4),
+  .games-list-table td:nth-child(4) {
+    display: none;
+  }
+  
+  .games-list-table td:first-child {
+    max-width: 90px;
+  }
+  
+  .slot-player-info span, .slot-player-info div {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mobile-controls {
+    gap: 10px;
+  }
+  
+  .mobile-control-section {
+    gap: 8px;
+  }
+  
+  .virtual-btn {
+    height: 48px !important;
+    min-width: 55px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  .action-keys .virtual-btn {
+    min-width: 70px !important;
+  }
+}
+
+/* Dedicated mobile landscape viewport styling to fit gameplay in 100vh height */
+@media (max-height: 520px) and (orientation: landscape) {
+  .app-container {
+    padding: 6px 12px !important;
+  }
+
+  header.compact {
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .game-screen-center {
+    display: grid !important;
+    grid-template-columns: 1.2fr 1fr !important;
+    grid-template-rows: auto auto !important;
+    gap: 8px !important;
+    width: 100% !important;
+    align-items: start !important;
+  }
+  
+  .canvas-container {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    max-height: 50vh !important;
+    width: 100% !important;
+  }
+  
+  .mobile-gameplay-ui {
+    grid-column: 2 !important;
+    grid-row: 1 / span 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    margin-top: 0 !important;
+    height: 100%;
+    justify-content: space-between;
+  }
+
+  .mobile-hud {
+    padding: 6px 10px !important;
+    gap: 6px !important;
+  }
+
+  .mobile-hud-row.bottom-row {
+    padding-top: 4px !important;
+  }
+  
+  .progress-tracks {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    margin-top: 0 !important;
+    padding: 6px 10px !important;
+    gap: 4px !important;
+  }
+
+  .progress-track-row {
+    gap: 6px !important;
+  }
+
+  .virtual-btn {
+    height: 42px !important;
+    min-width: 55px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+  }
+
+  .action-keys .virtual-btn {
+    min-width: 70px !important;
+  }
+  
+  /* Hide less critical sidebar panels to maximize screen space */
+  .game-screen > .sidebar-panel {
+    display: none !important;
+  }
 }

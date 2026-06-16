@@ -40,6 +40,12 @@ const Icons = {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
     </svg>
+  ),
+  Home: () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+      <polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </svg>
   )
 };
 
@@ -60,6 +66,15 @@ interface TrackElement {
   lane: number; // 0 (left), 1 (center), 2 (right)
   type: 'obstacle' | 'jump_obstacle' | 'duck_obstacle' | 'note';
   collected?: boolean;
+}
+
+function getHubUrl(): string {
+  if (typeof window === 'undefined') return 'http://localhost:19000';
+  const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:19000';
+  }
+  return `${proto}//kbs-cloud.com`;
 }
 
 export default function App() {
@@ -510,69 +525,90 @@ export default function App() {
     });
   };
 
+  // Helper functions for player actions (keyboard and touch)
+  const checkRhythmSync = (): boolean => {
+    const nowTime = audioSequencerRef.current ? (audioSequencerRef.current as any).audioCtx?.currentTime || 0 : 0;
+    if (lastBeatTimeRef.current > 0) {
+      const bpm = 120;
+      const secondsPerBeat = 60.0 / bpm;
+      const diff = Math.abs(nowTime - lastBeatTimeRef.current);
+      const diffNext = Math.abs(nowTime - (lastBeatTimeRef.current + secondsPerBeat));
+      if (diff < 0.12 || diffNext < 0.12) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const triggerRhythmActionFeedback = (isSync: boolean) => {
+    if (isSync) {
+      setScore(s => s + 50);
+      floatersRef.current.push({
+        x: 400 + (Math.random() * 80 - 40),
+        y: 200,
+        text: "PERFECT BEAT! +50",
+        color: '#00ffff',
+        life: 40
+      });
+    }
+  };
+
+  const performMoveLeft = () => {
+    if (!isPlayingRef.current) return;
+    const rhythmSync = checkRhythmSync();
+    if (playerLaneRef.current > 0) {
+      playerLaneRef.current--;
+      if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
+      triggerRhythmActionFeedback(rhythmSync);
+    }
+  };
+
+  const performMoveRight = () => {
+    if (!isPlayingRef.current) return;
+    const rhythmSync = checkRhythmSync();
+    if (playerLaneRef.current < 2) {
+      playerLaneRef.current++;
+      if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
+      triggerRhythmActionFeedback(rhythmSync);
+    }
+  };
+
+  const performJump = () => {
+    if (!isPlayingRef.current) return;
+    const rhythmSync = checkRhythmSync();
+    if (playerJumpTimerRef.current <= 0 && playerSlideTimerRef.current <= 0) {
+      playerJumpTimerRef.current = 25;
+      setJumpActive(true);
+      if (audioSequencerRef.current) audioSequencerRef.current.playJump();
+      triggerRhythmActionFeedback(rhythmSync);
+    }
+  };
+
+  const performSlide = () => {
+    if (!isPlayingRef.current) return;
+    const rhythmSync = checkRhythmSync();
+    if (playerSlideTimerRef.current <= 0 && playerJumpTimerRef.current <= 0) {
+      playerSlideTimerRef.current = 25;
+      setSlideActive(true);
+      if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
+      triggerRhythmActionFeedback(rhythmSync);
+    }
+  };
+
   // Keyboard handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlayingRef.current) return;
       
       const key = e.key.toLowerCase();
-      const nowTime = audioSequencerRef.current ? (audioSequencerRef.current as any).audioCtx?.currentTime || 0 : 0;
-      
-      // Determine if action is rhythmic (within 120ms of a beat)
-      let rhythmSync = false;
-      if (lastBeatTimeRef.current > 0) {
-        const bpm = 120;
-        const secondsPerBeat = 60.0 / bpm;
-        const diff = Math.abs(nowTime - lastBeatTimeRef.current);
-        const diffNext = Math.abs(nowTime - (lastBeatTimeRef.current + secondsPerBeat));
-        if (diff < 0.12 || diffNext < 0.12) {
-          rhythmSync = true;
-        }
-      }
-
       if (key === 'a' || e.key === 'ArrowLeft') {
-        // Move Left
-        if (playerLaneRef.current > 0) {
-          playerLaneRef.current--;
-          if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
-          triggerRhythmActionFeedback(rhythmSync);
-        }
+        performMoveLeft();
       } else if (key === 'd' || e.key === 'ArrowRight') {
-        // Move Right
-        if (playerLaneRef.current < 2) {
-          playerLaneRef.current++;
-          if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
-          triggerRhythmActionFeedback(rhythmSync);
-        }
+        performMoveRight();
       } else if (key === 'w' || e.key === 'ArrowUp') {
-        // Jump
-        if (playerJumpTimerRef.current <= 0 && playerSlideTimerRef.current <= 0) {
-          playerJumpTimerRef.current = 25; // 25 frames
-          setJumpActive(true);
-          if (audioSequencerRef.current) audioSequencerRef.current.playJump();
-          triggerRhythmActionFeedback(rhythmSync);
-        }
+        performJump();
       } else if (key === 's' || e.key === 'ArrowDown') {
-        // Slide / Duck
-        if (playerSlideTimerRef.current <= 0 && playerJumpTimerRef.current <= 0) {
-          playerSlideTimerRef.current = 25;
-          setSlideActive(true);
-          if (audioSequencerRef.current) audioSequencerRef.current.playSlide();
-          triggerRhythmActionFeedback(rhythmSync);
-        }
-      }
-    };
-
-    const triggerRhythmActionFeedback = (isSync: boolean) => {
-      if (isSync) {
-        setScore(s => s + 50);
-        floatersRef.current.push({
-          x: 400 + (Math.random() * 80 - 40),
-          y: 200,
-          text: "PERFECT BEAT! +50",
-          color: '#00ffff',
-          life: 40
-        });
+        performSlide();
       }
     };
 
@@ -1104,45 +1140,75 @@ export default function App() {
   const myEmail = currentUser?.email || 'runner@local';
   const myPlayer = gameState?.players.find(p => p.assignedEmail === myEmail || (online ? false : p.id === 'player_1'));
   const isHost = gameState?.players[0]?.assignedEmail === myEmail || gameState?.players[0]?.assignedEmail === 'runner@local';
+  const inGameplay = !!(gameState && (gameState.status === 'active' || gameState.status === 'completed'));
 
   return (
     <div className="app-container">
-      <header>
+      <header className={inGameplay ? 'compact' : ''}>
         <div>
           <h1>Gridlock Neon</h1>
-          <p className="tagline">Synthwave Rhythm Runner & Cyber-Highway Racer</p>
+          {!inGameplay && <p className="tagline">Synthwave Rhythm Runner & Cyber-Highway Racer</p>}
         </div>
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          {/* Navigation Controls */}
+          {!activeGameId ? (
+            <a 
+              href={getHubUrl()} 
+              className="btn outline-cyan" 
+              style={{ padding: '8px 14px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
+            >
+              <Icons.Grid /> HUB CATALOG
+            </a>
+          ) : (
+            <button 
+              className="btn outline-pink" 
+              style={{ padding: '8px 14px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => {
+                if (confirm("Disconnect from the gridway session and return to Net Lobbies?")) {
+                  stopGameSession();
+                  setActiveGameId(null);
+                  setGameState(null);
+                }
+              }}
+            >
+              <Icons.Home /> LEAVE GRID
+            </button>
+          )}
+
           {/* Online vs Offline Switch */}
-          <div 
-            className={`switch-container ${online ? 'active' : ''}`}
-            onClick={handleOnlineToggle}
-          >
-            <span className="font-mono" style={{ fontSize: '0.85rem' }}>{online ? 'ONLINE (SSO)' : 'OFFLINE'}</span>
-            <div className="switch-toggle"></div>
-          </div>
+          {!inGameplay && (
+            <div 
+              className={`switch-container ${online ? 'active' : ''}`}
+              onClick={handleOnlineToggle}
+            >
+              <span className="font-mono" style={{ fontSize: '0.85rem' }}>{online ? 'ONLINE (SSO)' : 'OFFLINE'}</span>
+              <div className="switch-toggle"></div>
+            </div>
+          )}
           
           {/* Profile Section */}
-          {online ? (
-            currentUser ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span className="badge cyan font-mono">{currentUser.displayName}</span>
-                <button className="btn outline-pink" style={{ padding: '6px 12px' }} onClick={handleLogout}>Logout</button>
-              </div>
+          {!inGameplay && (
+            online ? (
+              currentUser ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="badge cyan font-mono">{currentUser.displayName}</span>
+                  <button className="btn outline-pink" style={{ padding: '6px 12px' }} onClick={handleLogout}>Logout</button>
+                </div>
+              ) : (
+                <button className="btn primary-cyan" onClick={handleSSOLogin}>SSO Login</button>
+              )
             ) : (
-              <button className="btn primary-cyan" onClick={handleSSOLogin}>SSO Login</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="font-mono text-neon-cyan" style={{ fontSize: '0.9rem' }}>RUNNER PROFILE:</span>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  style={{ padding: '5px 10px', width: '130px', fontSize: '0.85rem' }} 
+                  value={localName}
+                  onChange={handleLocalNameChange}
+                />
+              </div>
             )
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span className="font-mono text-neon-cyan" style={{ fontSize: '0.9rem' }}>RUNNER PROFILE:</span>
-              <input 
-                type="text" 
-                className="form-control" 
-                style={{ padding: '5px 10px', width: '130px', fontSize: '0.85rem' }} 
-                value={localName}
-                onChange={handleLocalNameChange}
-              />
-            </div>
           )}
         </div>
       </header>
@@ -1254,8 +1320,8 @@ export default function App() {
                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                   </svg>
                 }
-                containerClassName=""
-                cardClassName=""
+                containerClassName="sso-dashboard-container"
+                cardClassName="sso-dashboard-card"
                 buttonClassName="btn primary-cyan"
               />
             ) : (
@@ -1592,6 +1658,113 @@ export default function App() {
                       <span className="font-mono text-neon-pink" style={{ fontSize: '0.9rem' }}>Spectating remaining pilots...</span>
                     </div>
                   )}
+                </div>
+
+                {/* Mobile HUD & Controls */}
+                <div className="mobile-gameplay-ui">
+                  {/* Compact HUD */}
+                  <div className="mobile-hud glass-panel">
+                    <div className="mobile-hud-row">
+                      <div className="mobile-hud-metric">
+                        <span className="metric-label font-mono">SHIELDS</span>
+                        <div className="mobile-shield-bar">
+                          {[1, 2, 3].map(sIdx => {
+                            const active = (isPlaying ? shield : (myPlayer?.shield ?? 3)) >= sIdx;
+                            return (
+                              <div 
+                                key={sIdx} 
+                                className={`shield-segment ${active ? 'active' : ''}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="mobile-hud-metric text-right">
+                        <span className="metric-label font-mono">COMBO</span>
+                        <span className="metric-value pink font-mono">{isPlaying ? streak : 0}</span>
+                      </div>
+
+                      <div className="mobile-hud-metric text-right">
+                        <span className="metric-label font-mono">SCORE</span>
+                        <span className="metric-value cyan font-mono">{isPlaying ? score : myPlayer?.score ?? 0}</span>
+                      </div>
+                    </div>
+
+                    <div className="mobile-hud-row bottom-row">
+                      <div className="mobile-hud-metric">
+                        <span className="metric-label font-mono">SABOTAGE</span>
+                        <div className="mobile-sabotage-bar">
+                          {[1, 2, 3, 4, 5].map(sIdx => {
+                            const active = sabotages >= sIdx;
+                            return (
+                              <div 
+                                key={sIdx} 
+                                className={`sabotage-segment ${active ? 'active' : ''}`}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      {/* Targets for mobile sabotage */}
+                      {gameState.players
+                        .filter(p => !isPlayerVacant(p, gameState.status) && p.id !== myPlayer?.id && !p.isDead && !p.isFinished)
+                        .length > 0 && (
+                          <div className="mobile-sabotage-targets">
+                            {gameState.players
+                              .filter(p => !isPlayerVacant(p, gameState.status) && p.id !== myPlayer?.id && !p.isDead && !p.isFinished)
+                              .map(p => (
+                                <button 
+                                  key={p.id}
+                                  className="btn outline-pink mobile-sabotage-btn"
+                                  disabled={sabotages < 5}
+                                  onClick={() => deployGlitchSabotage(p.id)}
+                                >
+                                  GLITCH {p.name.split(' ')[0].toUpperCase()}
+                                </button>
+                              ))}
+                          </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Virtual Controls */}
+                  <div className="mobile-controls">
+                    <div className="mobile-control-section movement-keys">
+                      <button 
+                        className="btn virtual-btn arrow-btn left-btn"
+                        onTouchStart={(e) => { e.preventDefault(); performMoveLeft(); }}
+                        onClick={performMoveLeft}
+                      >
+                        ◀
+                      </button>
+                      <button 
+                        className="btn virtual-btn arrow-btn right-btn"
+                        onTouchStart={(e) => { e.preventDefault(); performMoveRight(); }}
+                        onClick={performMoveRight}
+                      >
+                        ▶
+                      </button>
+                    </div>
+
+                    <div className="mobile-control-section action-keys">
+                      <button 
+                        className="btn virtual-btn action-btn jump-btn"
+                        onTouchStart={(e) => { e.preventDefault(); performJump(); }}
+                        onClick={performJump}
+                      >
+                        JUMP
+                      </button>
+                      <button 
+                        className="btn virtual-btn action-btn slide-btn"
+                        onTouchStart={(e) => { e.preventDefault(); performSlide(); }}
+                        onClick={performSlide}
+                      >
+                        SLIDE
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Progress bar tracks */}

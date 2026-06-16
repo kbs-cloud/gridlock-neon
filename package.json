@@ -1,7 +1,7 @@
 {
   "name": "04-gridlock-neon",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "npx tsc src/game/gameState.ts --outDir src/game/dist --module commonjs --target es2022 --moduleResolution node --noEmit false --esModuleInterop --ignoreConfig --ignoreDeprecations 6.0 && vite",
