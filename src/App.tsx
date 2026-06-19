@@ -158,7 +158,7 @@ export default function App() {
   const createNewGame = async (name: string, maxPlayers: number, distance: number) => {
     setErrorMsg(null);
     try {
-      const res = await gameService.createGame(name || 'Viper Runner Gridway', maxPlayers, distance);
+      const res = await gameService.createGame(name.trim(), maxPlayers, distance);
       if (res.success && res.gameId) {
         setActiveGameId(res.gameId);
         refreshActiveGame(res.gameId);
