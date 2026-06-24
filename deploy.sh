@@ -2,51 +2,42 @@
 # Exit on error
 set -e
 
-DEPLOY_DIR="/servers/gridlock-neon"
 REPO_DIR="/home/gemini/repos/kbs-cloud/gridlock-neon"
+APP_NAME="gridlock-neon"
+DEFAULT_OFFSET=5  # Offset in the port ranges
+
+# Determine if we are deploying production or test
+DEPLOY_ENV="testing"
+if [ "$1" == "prod" ] || [ "$DEPLOY_TYPE" == "prod" ] || [ "$DEPLOY_ENV" == "production" ]; then
+    DEPLOY_ENV="production"
+fi
+
+echo "=== Starting Gridlock Neon Deployment ($DEPLOY_ENV) ==="
 
 # Find Node.js path (default to NVM directory if not in current PATH)
 NODE_EXEC=$(which node || echo "/home/gemini/.nvm/versions/node/v24.16.0/bin/node")
 NODE_BIN=$(dirname "$NODE_EXEC")
-
-echo "=== Starting Gridlock Neon Deployment ==="
-echo "Node binary directory: $NODE_BIN"
-
-# Ensure NVM node directory is at the front of PATH so npm works correctly
 export PATH="$NODE_BIN:$PATH"
-
-# Default fallback environment variables
-BACKEND_PORT=20005
-FRONTEND_PORT=19005
-DATABASE_PATH="$DEPLOY_DIR/gridlock_neon.db"
-AUTH_SERVER_URL="http://localhost:20001"
-HUB_API_URL="http://localhost:20000"
-HUB_APP_TOKEN="gridlock_neon_token_dev_777"
-
-# Load local .env from project root if it exists
-if [ -f "$REPO_DIR/.env" ]; then
-    echo "Loading variables from local .env..."
-    # Export vars, filtering out comments and blank lines
-    export $(grep -v '^#' "$REPO_DIR/.env" | grep -v '^\s*$' | xargs)
-fi
-
-# Override with central /projects/environments/gridlock-neon.env if present
-if [ -f "/projects/environments/gridlock-neon.env" ]; then
-    echo "Loading variables from central gridlock-neon.env..."
-    export $(grep -v '^#' "/projects/environments/gridlock-neon.env" | grep -v '^\s*$' | xargs)
-fi
-
-# Print loaded environment (safe variables only)
-echo "Target Configuration:"
-echo "  FRONTEND_PORT: $FRONTEND_PORT"
-echo "  BACKEND_PORT:  $BACKEND_PORT"
-echo "  AUTH_SERVER_URL: $AUTH_SERVER_URL"
-echo "  HUB_API_URL:    $HUB_API_URL"
 
 # Build the project
 echo "Building project in $REPO_DIR..."
 cd "$REPO_DIR"
 npm run build
+
+# Assign ports and directories based on environment
+if [ "$DEPLOY_ENV" == "production" ]; then
+    DEPLOY_DIR="/servers/$APP_NAME"
+    FRONTEND_PORT=$((19000 + DEFAULT_OFFSET))
+    BACKEND_PORT=$((20000 + DEFAULT_OFFSET))
+    SERVICE_NAME="$APP_NAME"
+    SERVICE_DESC="Gridlock Neon Production Service"
+else
+    DEPLOY_DIR="/servers/dev/$APP_NAME"
+    FRONTEND_PORT=$((28000 + DEFAULT_OFFSET))
+    BACKEND_PORT=$((29000 + DEFAULT_OFFSET))
+    SERVICE_NAME="$APP_NAME-dev"
+    SERVICE_DESC="Gridlock Neon Dev/Testing Service"
+fi
 
 # Prepare deploy folder
 echo "Preparing deploy folder at $DEPLOY_DIR..."
@@ -83,12 +74,12 @@ cd "$DEPLOY_DIR"
 npm ci --omit=dev
 
 # Write systemd service file
-echo "Configuring systemd service..."
-SERVICE_FILE="/etc/systemd/system/gridlock-neon.service"
+echo "Configuring systemd service ($SERVICE_NAME)..."
+SERVICE_FILE="/etc/systemd/system/$SERVICE_NAME.service"
 
 sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
-Description=Gridlock Neon Game Service
+Description=$SERVICE_DESC
 After=network.target
 
 [Service]
@@ -97,7 +88,7 @@ User=gemini
 WorkingDirectory=$DEPLOY_DIR
 ExecStart=$NODE_BIN/node server.cjs
 Restart=always
-Environment=NODE_ENV=production BACKEND_PORT=$BACKEND_PORT FRONTEND_PORT=$FRONTEND_PORT DATABASE_PATH=$DATABASE_PATH AUTH_SERVER_URL=$AUTH_SERVER_URL HUB_API_URL=$HUB_API_URL HUB_APP_TOKEN=$HUB_APP_TOKEN
+Environment=NODE_ENV=production BACKEND_PORT=$BACKEND_PORT FRONTEND_PORT=$FRONTEND_PORT DATABASE_PATH=$DEPLOY_DIR/gridlock_neon.db AUTH_SERVER_URL=http://localhost:20001 HUB_API_URL=http://localhost:20000 HUB_APP_TOKEN=gridlock_neon_token_dev_777
 Environment="PATH=$NODE_BIN:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 [Install]
@@ -105,13 +96,28 @@ WantedBy=multi-user.target
 EOF
 
 # Reload and restart service
-echo "Reloading systemd and restarting gridlock-neon service..."
+echo "Reloading systemd and restarting $SERVICE_NAME service..."
 sudo systemctl daemon-reload
-sudo systemctl enable gridlock-neon
-sudo systemctl restart gridlock-neon
+sudo systemctl enable "$SERVICE_NAME"
+sudo systemctl restart "$SERVICE_NAME"
 
 # Run the database registration utility
 echo "Registering application and achievements in the Hub catalog..."
-node register_game.cjs
+DEPLOY_ENV=$DEPLOY_ENV node register_game.cjs
 
-echo "=== Deployment Finished Successfully ==="
+# Handle Git Tagging
+if [ "$DEPLOY_ENV" == "production" ]; then
+    echo "Creating release tags..."
+    cd "$REPO_DIR"
+    TAG_NAME="prod-$APP_NAME-v$(date +%Y%m%d-%H%M%S)"
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "Creating git tag $TAG_NAME..."
+        git tag "$TAG_NAME"
+        # Push tag, catch errors gracefully
+        git push origin "$TAG_NAME" >/dev/null 2>&1 || echo "Warning: Could not push git tag to remote."
+    fi
+else
+    echo "Skipping git tagging for test/dev deployment."
+fi
+
+echo "=== Deployment Finished Successfully ($DEPLOY_ENV) ==="

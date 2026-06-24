@@ -15,15 +15,30 @@ const db = new sqlite3.Database(dbPath, (err) => {
 db.serialize(() => {
   // 1. Register Gridlock Neon Application
   const appId = 'gridlock-neon';
-  
-  db.get('SELECT id FROM apps WHERE id = ?', [appId], (err, row) => {
+  const isProd = process.env.DEPLOY_ENV === 'production';
+  const devUrl = 'http://localhost:28005';
+  const prodUrl = 'https://gridlock.kbs-cloud.com';
+
+  db.get('SELECT id, prod_url FROM apps WHERE id = ?', [appId], (err, row) => {
     if (err) {
       console.error('Error querying apps table:', err.message);
       process.exit(1);
     }
 
     if (row) {
-      console.log(`Application "${appId}" is already registered in the Hub.`);
+      console.log(`Application "${appId}" is already registered in the Hub. Updating URLs...`);
+      const now = new Date().toISOString();
+      if (isProd) {
+        db.run('UPDATE apps SET dev_url = ?, prod_url = ?, updated_at = ? WHERE id = ?', [devUrl, prodUrl, now, appId], (updErr) => {
+          if (updErr) console.error('Failed to update app URLs:', updErr.message);
+          else console.log(`Application "${appId}" URLs updated for production.`);
+        });
+      } else {
+        db.run('UPDATE apps SET dev_url = ?, updated_at = ? WHERE id = ?', [devUrl, now, appId], (updErr) => {
+          if (updErr) console.error('Failed to update app URLs:', updErr.message);
+          else console.log(`Application "${appId}" URLs updated for dev/testing.`);
+        });
+      }
     } else {
       console.log(`Registering application "${appId}"...`);
       const now = new Date().toISOString();
@@ -49,8 +64,8 @@ db.serialize(() => {
           graphics: "Integrated Graphics",
           storage: "100 MB available space"
         }),
-        prod_url: "https://gridlock.kbs-cloud.com",
-        dev_url: "http://localhost:19005",
+        prod_url: isProd ? prodUrl : null,
+        dev_url: devUrl,
         github_url: "https://github.com/kbs-cloud/gridlock-neon",
         download_url: "https://github.com/kbs-cloud/gridlock-neon/releases",
         cover_image: "/gridlock_neon_cover.png",
