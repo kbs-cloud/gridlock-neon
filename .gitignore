@@ -39,3 +39,6 @@ dist-ssr
 NEXT_COMMIT.txt
 NEXT_CHANGELOG.md
 walkthrough.md
+
+# Build outputs
+out/
